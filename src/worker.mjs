@@ -1,6 +1,7 @@
 import {resolveArmy} from './army-forge.mjs';
 import {formatForceOrgPreview} from './force-org.mjs';
 import {fetchFactionBook} from './faction-fetch.mjs';
+import {fetchSharedList,resolveSharedList} from './shared-list.mjs';
 
 const TTL=600, MAX_BYTES=6_000_000, MAX_STORED=1_000_000;
 const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -30,7 +31,7 @@ export function buildImport(roster,book){
  const output=formatForceOrgPreview(resolved).listJson;
  return output;
 }
-export function createWorker({now=()=>Date.now(),random=globalThis.crypto,fetchBook=fetchFactionBook}={}){
+export function createWorker({now=()=>Date.now(),random=globalThis.crypto,fetchBook=fetchFactionBook,fetchShare=fetchSharedList}={}){
  return {async fetch(request,env){
   const url=new URL(request.url);
   if(!url.pathname.startsWith('/api/'))return env.ASSETS?env.ASSETS.fetch(request):respond({error:'Website assets not configured'},404);
@@ -38,8 +39,12 @@ export function createWorker({now=()=>Date.now(),random=globalThis.crypto,fetchB
    const origin=request.headers.get('origin');
    if(origin&&origin!==url.origin)return respond({error:'Cross-origin preview refused'},403);
    let input;
-   try{input=await readJSON(request);if(!input?.roster)throw Error('Missing Army Forge roster')}
+   try{input=await readJSON(request);if(!input?.roster&&!input?.shareUrl&&!input?.sharedList)throw Error('Missing Army Forge roster')}
    catch(e){return respond({error:String(e.message||e)},400)}
+   if(input.shareUrl||input.sharedList){
+    try{const resolved=resolveSharedList(input.sharedList??await fetchShare(input.shareUrl));formatForceOrgPreview(resolved);return respond({resolved})}
+    catch(e){return respond({error:String(e.message||e)},400)}
+   }
    const allowVersionMismatch=input.allowVersionMismatch===true;
    let book;
    try{book=await fetchBook(input.roster,{allowVersionMismatch})}
@@ -59,9 +64,15 @@ export function createWorker({now=()=>Date.now(),random=globalThis.crypto,fetchB
    let listJson;
    try{
     const input=await readJSON(request);
-    if(!input||typeof input!=='object'||!input.roster)throw Error('Missing Army Forge roster');
-    const book=input.book??await fetchBook(input.roster,{allowVersionMismatch:false});
-    listJson=buildImport(input.roster,book);
+    if(!input||typeof input!=='object')throw Error('Missing Army Forge roster');
+    if(input.shareUrl||input.sharedList){
+     const resolved=resolveSharedList(input.sharedList??await fetchShare(input.shareUrl));
+     listJson=formatForceOrgPreview(resolved).listJson;
+    }else{
+     if(!input.roster)throw Error('Missing Army Forge roster');
+     const book=input.book??await fetchBook(input.roster,{allowVersionMismatch:false});
+     listJson=buildImport(input.roster,book);
+    }
     for(const u of listJson.units)u.unitId=random.randomUUID();
    }catch(e){const msg=String(e.message||e);return respond({error:msg},msg==='Request too large'?413:400)}
    if(new TextEncoder().encode(JSON.stringify(listJson)).length>MAX_STORED)return respond({error:'Converted army too large'},413);
