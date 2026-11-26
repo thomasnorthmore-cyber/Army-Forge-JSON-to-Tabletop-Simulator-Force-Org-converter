@@ -4,7 +4,8 @@ const clean=x=>String(x??'').replace(/[\[\]\r\n]/g,' ').trim();
 const unique=x=>[...new Set(x)];
 const color=(hex,s,bold=false)=>'['+hex+']'+(bold?'[b]':'')+s+(bold?'[/b]':'')+'[-]';
 const grants=new Map([['Rending in Melee',[false,'Rending']],['Shred in Melee',[false,'Shred']],['Unstoppable in Melee',[false,'Unstoppable']],['Shred when Shooting',[true,'Shred']],['Anti-Cover when Shooting',[true,'Anti-Cover']],['Unstoppable when Shooting',[true,'Unstoppable']]]);
-function modelDefinition(model,unit){
+const auraGrants=new Map([['Counter in Melee Aura',[false,'Counter']],['Shred in Melee Aura',[false,'Shred']],['Unstoppable in Melee Aura',[false,'Unstoppable']],['Bane in Melee Aura',[false,'Bane']],['Shred when Shooting Aura',[true,'Shred']],['Bane when Shooting Aura',[true,'Bane']],['Anti-Cover when Shooting Aura',[true,'Anti-Cover']],['Anti-Cover Aura',[true,'Anti-Cover']],['Unstoppable when Shooting Aura',[true,'Unstoppable']]]);
+function modelDefinition(model,unit,groupAuras=[]){
  const name=clean(model.name||unit.name||'Model');
  if(!name||!Number.isInteger(unit.quality)||!Number.isInteger(unit.defense))throw Error('Invalid model statistics');
  const abilities=unique(arr(model.abilities).map(clean).filter(Boolean));
@@ -12,7 +13,7 @@ function modelDefinition(model,unit){
   if(!Number.isFinite(w.range)||w.range<0||!Number.isInteger(w.attacks)||w.attacks<1||!clean(w.name))throw Error('Invalid weapon profile on '+name);
   const base=unique(arr(w.specialRules).map(r=>clean(r.label||r.name+(r.rating!=null?'('+r.rating+')':''))));
   const crossing=base.includes('Crossing Strike'), ranged=w.range>0||crossing;
-  const rules=unique([...base,...abilities.filter(a=>grants.has(a)&&grants.get(a)[0]===ranged).map(a=>grants.get(a)[1])]);
+  const rules=unique([...base,...abilities.filter(a=>grants.has(a)&&grants.get(a)[0]===ranged).map(a=>grants.get(a)[1]),...groupAuras.filter(a=>auraGrants.get(a)[0]===ranged).map(a=>auraGrants.get(a)[1])]);
   return {name:clean(w.name),range:w.range,attacks:w.attacks,crossing,ranged,rules};
  });
  const lines=[color('A4FF61','Quality '+unit.quality+'+   Defense '+unit.defense+'+')];
@@ -45,7 +46,8 @@ export function formatForceOrgPreview(resolved){
  }
  const units=resolved.units.filter(u=>!u.joinToUnit).map((u,i)=>{
   const members=[u,...resolved.units.filter(h=>h.joinToUnit===u.selectionId)];
-  return {name:clean(u.name),selectionId:String(u.selectionId),unitId:'af_'+(i+1)+'_'+String(u.selectionId),modelDefinitions:members.flatMap(m=>m.models.map(model=>modelDefinition(model,m)))};
+  const groupAuras=unique(members.flatMap(m=>m.models.flatMap(model=>arr(model.abilities))).filter(a=>auraGrants.has(a)));
+  return {name:clean(u.name),selectionId:String(u.selectionId),unitId:'af_'+(i+1)+'_'+String(u.selectionId),modelDefinitions:members.flatMap(m=>m.models.map(model=>modelDefinition(model,m,groupAuras)))};
  });
  const modelCount=units.reduce((n,u)=>n+u.modelDefinitions.length,0);
  if(modelCount!==resolved.modelCount||modelCount>500||modelCount<1)throw Error('Model count mismatch');
