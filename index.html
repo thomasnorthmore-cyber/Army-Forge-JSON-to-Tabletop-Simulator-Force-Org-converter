@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Army Forge Import Preview</title>
+<style>body{font:16px system-ui;background:#121720;color:#edf2f7;max-width:780px;margin:48px auto;padding:0 20px}main{background:#202938;padding:24px;border-radius:12px}label{display:block;margin:16px 0}input[type=file]{display:block;margin:8px 0;max-width:100%}button{padding:10px 16px;margin:8px 8px 8px 0;background:#9ed6f4;color:#101820;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#10151d;padding:16px;border-radius:8px}small{color:#b6c5d4}</style>
+<main><h1>Army Forge → Force Org</h1><p>Stage 1 · Local roster resolution preview</p>
+<p>Files remain in your browser. This is not yet an army-code generator.</p>
+<label>Army Forge roster (.json)<input id="roster" type="file" accept=".json,application/json"></label>
+<label>Matching faction response (.json or .txt)<input id="book" type="file" accept=".json,.txt,application/json,text/plain"></label>
+<label><input id="mismatch" type="checkbox"> Allow a different faction version for inspection only</label>
+<button id="run">Resolve roster</button><button id="download" disabled>Download diagnostic JSON</button>
+<pre id="out" role="status" aria-live="polite">Select both files to begin.</pre>
+<small>Unsupported equipment configurations are rejected rather than silently changed. No live data retrieval or TTS import in this build.</small></main>
+<script type="module">
+import {resolveArmy} from './src/army-forge.mjs';
+const el=id=>document.getElementById(id);let result;
+async function read(id){const f=el(id).files[0];if(!f)throw Error('Select both files');if(f.size>5000000)throw Error('File exceeds 5 MB');return JSON.parse(await f.text())}
+el('run').onclick=async()=>{result=null;el('download').disabled=true;try{result=resolveArmy(await read('roster'),await read('book'),{allowVersionMismatch:el('mismatch').checked});const lines=[result.listName,'Roster '+result.rosterVersion+' / faction '+result.bookVersion,result.modelCount+' models | '+result.units.length+' selections',...result.warnings,''];for(const u of result.units){lines.push(u.name+' ×'+u.models.length+(u.joinToUnit?' — attached to '+result.units.find(x=>x.selectionId===u.joinToUnit).name:''));for(const [i,m] of u.models.entries())lines.push('  '+(i+1)+': '+m.weapons.map(w=>w.name+' (A'+w.attacks+(w.range?', '+w.range+'"':'')+(w.effectiveRules.length?', '+w.effectiveRules.join(', '):'')+')').join('; ')+' | '+m.abilities.join(', '));}el('out').textContent=lines.join('\n');el('download').disabled=false}catch(e){el('out').textContent='Cannot resolve: '+e.message}};
+el('download').onclick=()=>{if(!result)return;const url=URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='army-forge-preview.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+</script></html>
