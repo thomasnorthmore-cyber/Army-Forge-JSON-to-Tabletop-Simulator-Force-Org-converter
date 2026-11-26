@@ -48,3 +48,13 @@ assert.equal(refused.status,403);
 const down=createWorker({fetchBook:async()=>{throw Error('Upstream unavailable')}});
 assert.equal((await down.fetch(new Request(origin+'/api/preview',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({roster})}),{})).status,502);
 console.log('33 code service and preview assertions passed');
+
+const writeRequest=()=>new Request(origin+'/api/upload',{method:'POST',headers:{'content-type':'application/json','CF-Connecting-IP':'192.0.2.1'},body:'{}'});
+const blocked={...env,REQUIRE_RATE_LIMITS:'true',CLIENT_LIMIT:{limit:async({key})=>({success:key!=='192.0.2.1'})},WRITE_LIMIT:{limit:async()=>({success:true})}};
+assert.equal((await worker.fetch(writeRequest(),blocked)).status,429);
+const busy={...blocked,CLIENT_LIMIT:{limit:async()=>({success:true})},WRITE_LIMIT:{limit:async()=>({success:false})}};
+assert.equal((await worker.fetch(writeRequest(),busy)).status,429);
+assert.equal((await worker.fetch(writeRequest(),{...env,REQUIRE_RATE_LIMITS:'true'})).status,503);
+const allowed={...blocked,CLIENT_LIMIT:{limit:async()=>({success:true})}};
+assert.equal((await worker.fetch(writeRequest(),allowed)).status,400);
+console.log('4 rate-limit assertions passed');
