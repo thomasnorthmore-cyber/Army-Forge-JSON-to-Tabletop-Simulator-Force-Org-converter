@@ -1,29 +1,132 @@
 <!doctype html>
-<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Army Forge Import Preview</title>
-<style>body{font:16px system-ui;background:#121720;color:#edf2f7;max-width:780px;margin:48px auto;padding:0 20px}main{background:#202938;padding:24px;border-radius:12px}label{display:block;margin:16px 0}input[type=file]{display:block;margin:8px 0;max-width:100%}button{padding:10px 16px;margin:8px 8px 8px 0;background:#9ed6f4;color:#101820;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#10151d;padding:16px;border-radius:8px}small{color:#b6c5d4}</style>
-<main><h1>Army Forge → Force Org</h1><p>Stage 6 · Army Forge shared links</p>
-<p>Paste a shared list URL or upload a saved Army Forge TTS response. Original roster JSON and optional faction response remain supported. Shared links first fetch Army Forge directly in your browser without credentials; if that connection fails, the Worker tries instead. Generate army code submits the selected input for server-side validation. Only the converted model cards are stored for ten minutes.</p>
-<label>Army Forge shared army URL (preferred)<input id="share" type="url" placeholder="https://army-forge.onepagerules.com/share?id=..." style="display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px"></label><label>Or upload roster / saved TTS response (.json)<input id="roster" type="file" accept=".json,application/json"></label>
-<label>Optional faction response (.json or .txt) — overrides automatic retrieval<input id="book" type="file" accept=".json,.txt,application/json,text/plain"></label>
-<label><input id="mismatch" type="checkbox"> Allow a different faction version for inspection only</label>
-<button id="run">Resolve roster</button><button id="download" disabled>Download diagnostic JSON</button><button id="forceorg" disabled>Download Force Org preview</button>
-<button id="generate" disabled>Generate army code</button><button id="copyCode" disabled>Copy code</button><p id="codeStatus" role="status" aria-live="polite"></p><pre id="out" role="status" aria-live="polite">Select your army JSON to begin.</pre>
-<small>Unsupported equipment configurations are rejected rather than silently changed. Automatic retrieval is experimental; if the request fails, upload a matching faction response. Original roster codes require a matching version and points total. Shared responses do not expose a patch version; the formatter targets the 3.6 rules family. Live TTS compatibility is awaiting testing.</small></main>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Army Forge | Force Org Importer</title>
+<style>
+:root{color-scheme:dark;--bg:#10151b;--panel:#19212b;--line:#303c49;--text:#f0f3f7;--muted:#a6b4c4;--accent:#bce48c;--accentText:#182312;--danger:#ffc1b8}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#1c2b2b 0,transparent 55%),var(--bg);color:var(--text);font:15px/1.55 system-ui,-apple-system,sans-serif}button,input{font:inherit}a{color:var(--accent)}main{max-width:720px;margin:auto;padding:48px 20px 24px}header{margin-bottom:28px}.brand{display:flex;align-items:center;gap:10px;color:var(--accent);font-size:12px;letter-spacing:.16em;font-weight:700;text-transform:uppercase}.mark{width:30px;height:30px;border:1px solid #688151;border-radius:9px;display:grid;place-items:center;font-size:19px;letter-spacing:0}h1{font-size:clamp(30px,6vw,43px);line-height:1.13;letter-spacing:-.045em;margin:15px 0 8px}h2{font-size:19px;margin:0 0 5px;letter-spacing:-.02em}p{margin:0 0 12px}.muted,small{color:var(--muted)}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 12px 32px #0002}.eyebrow{font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}label{display:block;font-size:13px;font-weight:600;margin:12px 0 6px}input[type=url],input[type=file]{width:100%;min-width:0;padding:12px;border:1px solid var(--line);border-radius:9px;background:#111820;color:var(--text)}input::placeholder{color:#8c9bac}input:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}input[type=file]{padding:8px}input::file-selector-button{padding:7px 10px;margin-right:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);cursor:pointer}button{border:1px solid transparent;border-radius:9px;padding:11px 16px;background:var(--accent);color:var(--accentText);font-weight:700;cursor:pointer;min-height:44px}button:hover:not(:disabled){filter:brightness(1.08)}button:disabled{opacity:.45;cursor:not-allowed}.primary{width:100%;margin-top:14px}.secondary{background:transparent;color:var(--text);border-color:var(--line);font-weight:600}details{margin-top:16px;border-top:1px solid var(--line);padding-top:13px}summary{cursor:pointer;color:var(--muted);font-weight:600;font-size:13px}details[open] summary{margin-bottom:14px}.check{display:flex;align-items:flex-start;gap:8px;font-weight:400;color:var(--muted)}.check input{margin-top:5px}.status{font-size:13px;color:var(--muted);margin:12px 0 0;overflow-wrap:anywhere}.status.error{color:var(--danger)}.status.ok{color:var(--accent)}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.metric{background:#111820;border:1px solid var(--line);border-radius:10px;padding:12px}.metric strong{display:block;font-size:25px;font-variant-numeric:tabular-nums;line-height:1.2}.metric span{display:block;color:var(--muted);font-size:12px;margin-top:4px}.unit{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}.unit:last-child{border-bottom:0}.unit span{color:var(--muted);text-align:right;white-space:nowrap}.unit small{display:block;font-size:12px}.codebox{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#111820;border:1px solid #526943;border-radius:12px;padding:15px;margin:16px 0 8px}.codebox output{flex:1;font:700 clamp(19px,5vw,27px)/1.2 ui-monospace,Consolas,monospace;letter-spacing:.03em;color:var(--accent);overflow-wrap:anywhere}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}pre{font:12px/1.6 ui-monospace,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:380px;overflow:auto;background:#111820;padding:14px;border-radius:9px;color:var(--muted)}footer{font-size:12px;color:var(--muted);padding:4px 4px 22px}footer details{margin-top:8px}footer p{margin-top:8px}[hidden]{display:none!important}@media(max-width:480px){main{padding:26px 14px}.panel{padding:18px}.metric{padding:9px}.metric strong{font-size:21px}.metric span{font-size:11px}.unit span{white-space:normal}.codebox button{width:100%}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="brand"><span class="mark" aria-hidden="true">↗</span> Force Org importer</div>
+<h1>Army Forge to Tabletop Simulator</h1>
+<p class="muted">Import your Grimdark Future army in three simple steps.</p>
+</header>
+<section class="panel" aria-labelledby="importHeading">
+<div class="eyebrow">01 / Import</div>
+<h2 id="importHeading">Add your army</h2>
+<p class="muted">Copy the share link from Army Forge and paste it below.</p>
+<label for="share">Army Forge share link</label>
+<input id="share" type="url" placeholder="https://army-forge.onepagerules.com/share?id=…" autocomplete="off" spellcheck="false">
+<button id="run" class="primary">Import army</button>
+<p id="status" class="status" role="status" aria-live="polite"></p>
+<details id="advanced"><summary>Advanced import options</summary>
+<label for="roster">Army JSON or saved TTS response</label><input id="roster" type="file" accept=".json,application/json">
+<label for="book">Optional faction response</label><input id="book" type="file" accept=".json,.txt,application/json,text/plain">
+<label class="check"><input id="mismatch" type="checkbox"> Allow a different faction version for inspection only</label>
+<small>Leave the share link empty when importing a file.</small></details>
+</section>
+<section id="armyPanel" class="panel" hidden aria-labelledby="armyTitle">
+<div class="eyebrow">02 / Review</div>
+<h2 id="armyTitle"></h2>
+<p id="armyMeta" class="muted"></p>
+<div class="metrics"><div class="metric"><strong id="points"></strong><span>Points</span></div><div class="metric"><strong id="models"></strong><span>Models</span></div><div class="metric"><strong id="groups"></strong><span>Unit groups</span></div></div>
+<div id="unitList"></div>
+<p id="warnings" class="status error" hidden></p>
+<button id="generate" class="primary" disabled>Generate army code</button>
+<details><summary>Model details &amp; diagnostic downloads</summary><pre id="out"></pre><div class="actions"><button id="download" class="secondary" disabled>Diagnostic JSON</button><button id="forceorg" class="secondary" disabled>Force Org JSON</button></div></details>
+</section>
+<section id="codePanel" class="panel" hidden aria-labelledby="codeHeading">
+<div class="eyebrow">03 / Import into TTS</div>
+<h2 id="codeHeading">Your army code</h2>
+<p class="muted">Paste the code into the Force Org import window in Tabletop Simulator.</p>
+<div id="codeBox" class="codebox" hidden><output id="codeValue" aria-label="Army code"></output><button id="copyCode" disabled>Copy code</button></div>
+<p id="codeStatus" class="status" role="status" aria-live="polite"></p>
+<details><summary>First time setup</summary><p class="muted">Set the Force Org import server to:</p><div class="actions"><button id="copyServer" class="secondary">Copy server URL</button></div><small id="serverUrl"></small></details>
+</section>
+<footer><p>Codes expire after 10 minutes. Independent community tool, not an official One Page Rules or Tabletop Simulator product.</p><details><summary>Compatibility &amp; privacy</summary><p>Grimdark Future 3.6 formatter. Shared responses do not specify a patch version. Unsupported equipment or combined squads are rejected rather than silently altered. Manual files are resolved locally; shared links are retrieved directly from Army Forge where possible, with Worker fallback. Code generation sends the input for validation and stores only the converted model cards for 10 minutes.</p></details></footer>
+</main>
 <script type="module">
 import {resolveSharedList,fetchSharedList} from './src/shared-list.mjs';
 import {resolveArmy} from './src/army-forge.mjs';
 import {formatForceOrgPreview} from './src/force-org.mjs';
-const el=id=>document.getElementById(id);let result, formatted, input, activeCode;
-async function read(id){const f=el(id).files[0];if(!f)throw Error('Select the required file');if(f.size>5000000)throw Error('File exceeds 5 MB');return JSON.parse(await f.text())}
-el('run').onclick=async()=>{result=null;formatted=null;input=null;activeCode=null;el('generate').disabled=true;el('copyCode').disabled=true;el('codeStatus').textContent='';el('download').disabled=true;el('forceorg').disabled=true;el('run').disabled=true;try{const shareUrl=el('share').value.trim(),allowVersionMismatch=el('mismatch').checked;
-const preview=async(payload)=>{const response=await fetch('/api/preview',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});const data=await response.json();if(!response.ok)throw Error(data.error||'Preview service unavailable');return data.resolved};
-if(shareUrl){if(el('roster').files.length)throw Error('Choose a share URL or file, not both');el('out').textContent='Retrieving shared list directly from Army Forge…';let sharedList;try{sharedList=await fetchSharedList(shareUrl)}catch(browserError){el('out').textContent='Browser retrieval failed; trying Worker…';try{input={shareUrl};result=await preview(input)}catch(workerError){throw Error('Browser: '+browserError.message+' | Worker: '+workerError.message)}}if(sharedList){result=resolveSharedList(sharedList);input={sharedList}}}
-else{const roster=await read('roster');if(Array.isArray(roster.units)&&!roster.list){input={sharedList:roster};result=resolveSharedList(roster)}
-else{const manual=!!el('book').files[0];el('out').textContent=manual?'Reading supplied faction response…':'Requesting faction from Army Forge…';let book;if(manual){book=await read('book');result=resolveArmy(roster,book,{allowVersionMismatch})}else result=await preview({roster,allowVersionMismatch});input={roster,...(manual?{book}:{})}}}
-formatted=formatForceOrgPreview(result);const lines=[result.listName,result.source==='army-forge-tts'?'Shared-list data / patch version not provided':'Roster '+result.rosterVersion+' / faction '+result.bookVersion,result.modelCount+' models | '+result.units.length+' selections','Declared points: '+(result.declaredPoints??'unknown')+' | computed: '+result.computedPoints,...result.warnings,''];for(const u of result.units){lines.push(u.name+' ×'+u.models.length+' — '+u.points+' pts'+(u.joinToUnit?' — attached to '+result.units.find(x=>x.selectionId===u.joinToUnit).name:''));for(const [i,m] of u.models.entries())lines.push('  '+(i+1)+': '+m.weapons.map(w=>w.name+' (A'+w.attacks+(w.range?', '+w.range+'"':'')+(w.effectiveRules.length?', '+w.effectiveRules.join(', '):'')+')').join('; ')+' | '+m.abilities.join(', '));}el('out').textContent=lines.join('\n');el('download').disabled=false;el('forceorg').disabled=false;el('generate').disabled=result.warnings.length>0||!Number.isInteger(result.declaredPoints)||result.declaredPoints!==result.computedPoints}catch(e){el('out').textContent='Cannot resolve: '+e.message}finally{el('run').disabled=false}};
-el('download').onclick=()=>{if(!result)return;const url=URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='army-forge-preview.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
-el('forceorg').onclick=()=>{if(!formatted)return;const url=URL.createObjectURL(new Blob([JSON.stringify(formatted,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='force-org-preview.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
-el('generate').onclick=async()=>{if(!input||!result||result.warnings.length)return;const submitted=input;el('generate').disabled=true;el('run').disabled=true;el('copyCode').disabled=true;activeCode=null;el('codeStatus').textContent='Generating army code…';try{const response=await fetch('/api/upload',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(submitted)});const data=await response.json();if(!response.ok)throw Error(data.error||'Code service unavailable');activeCode=data.code;el('codeStatus').textContent=data.code+' — expires '+new Date(data.expiresAt).toLocaleTimeString()+' ('+data.models+' models)';el('copyCode').disabled=false}catch(e){el('codeStatus').textContent='Cannot generate code: '+e.message}finally{el('run').disabled=false;el('generate').disabled=!input||!result||result.warnings.length>0}};
-el('copyCode').onclick=async()=>{if(activeCode)try{await navigator.clipboard.writeText(activeCode);el('codeStatus').textContent=activeCode+' copied — valid for ten minutes from creation'}catch{el('codeStatus').textContent='Copy manually: '+activeCode}};
-for(const id of ['share','roster','book','mismatch'])el(id).addEventListener('change',()=>{input=null;result=null;formatted=null;activeCode=null;for(const button of ['generate','download','forceorg','copyCode'])el(button).disabled=true;el('codeStatus').textContent='Resolve the updated files first.'});
-</script></html>
+const el=id=>document.getElementById(id);
+let result,formatted,input,activeCode,expiresAt,timer,busy=false;
+const server='https://army-forge-force-org-converter.opr-force-generator.workers.dev';
+el('serverUrl').textContent=server;
+function status(message,kind=''){el('status').textContent=message;el('status').className='status '+kind}
+function codeStatus(message,kind=''){el('codeStatus').textContent=message;el('codeStatus').className='status '+kind}
+function clearCode(){clearInterval(timer);activeCode=null;expiresAt=null;el('codePanel').hidden=true;el('codeBox').hidden=true;el('codeValue').textContent='';el('copyCode').disabled=true;el('copyCode').textContent='Copy code';codeStatus('')}
+function valid(){return !!input&&!!result&&!result.warnings.length&&Number.isInteger(result.declaredPoints)&&result.declaredPoints===result.computedPoints}
+function setBusy(value){busy=value;for(const id of ['share','roster','book','mismatch','run'])el(id).disabled=value;el('generate').disabled=value||!valid()}
+function clearResult(){result=null;formatted=null;input=null;clearCode();el('armyPanel').hidden=true;el('download').disabled=true;el('forceorg').disabled=true;el('generate').disabled=true}
+async function read(id){const f=el(id).files[0];if(!f)throw Error('Choose a share link or JSON file first.');if(f.size>5000000)throw Error('File exceeds 5 MB');return JSON.parse(await f.text())}
+async function post(path,payload){const response=await fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});let data;try{data=await response.json()}catch{throw Error('Service returned an invalid response (HTTP '+response.status+')')}if(!response.ok)throw Error(data.error||'Service unavailable');return data}
+async function preview(payload){return (await post('/api/preview',payload)).resolved}
+function renderArmy(){
+ el('armyTitle').textContent=result.listName||'Imported army';
+ el('armyMeta').textContent=result.source==='army-forge-tts'?'Grimdark Future · Army Forge shared list':'Grimdark Future · '+result.bookVersion;
+ el('points').textContent=result.computedPoints;el('models').textContent=result.modelCount;el('groups').textContent=formatted.listJson.units.length;
+ const list=el('unitList');list.replaceChildren();
+ for(const u of result.units){
+  const row=document.createElement('div');row.className='unit';
+  const title=document.createElement('div');title.textContent=u.name+' × '+u.models.length;
+  if(u.joinToUnit){const sub=document.createElement('small');sub.textContent='Attached to '+(result.units.find(x=>x.selectionId===u.joinToUnit)?.name||'unit');title.append(sub)}
+  const points=document.createElement('span');points.textContent=u.points+' pts';row.append(title,points);list.append(row);
+ }
+ el('warnings').textContent=result.warnings.join(' · ');el('warnings').hidden=!result.warnings.length;
+ const lines=[result.listName,result.source==='army-forge-tts'?'Shared-list data / patch version not provided':'Roster '+result.rosterVersion+' / faction '+result.bookVersion,'Declared points: '+(result.declaredPoints??'unknown')+' | computed: '+result.computedPoints,...result.warnings,''];
+ for(const u of result.units){lines.push(u.name+' ×'+u.models.length+' — '+u.points+' pts');for(const [i,m] of u.models.entries())lines.push('  '+(i+1)+': '+m.weapons.map(w=>w.name+' (A'+w.attacks+(w.range?', '+w.range+'"':'')+(w.effectiveRules.length?', '+w.effectiveRules.join(', '):'')+')').join('; ')+' | '+m.abilities.join(', '))}
+ el('out').textContent=lines.join('\n');el('armyPanel').hidden=false;el('download').disabled=false;el('forceorg').disabled=false;
+}
+el('run').onclick=async()=>{
+ if(busy)return;clearResult();setBusy(true);
+ try{
+  const shareUrl=el('share').value.trim(),allowVersionMismatch=el('mismatch').checked;
+  if(shareUrl){
+   if(el('roster').files.length)throw Error('Choose a share link or file, not both.');
+   status('Retrieving army from Army Forge…');
+   let sharedList;
+   try{sharedList=await fetchSharedList(shareUrl)}catch(browserError){
+    status('Trying the import server…');
+    try{input={shareUrl};result=await preview(input)}catch(workerError){throw Error('Browser: '+browserError.message+' | Server: '+workerError.message)}
+   }
+   if(sharedList){result=resolveSharedList(sharedList);input={sharedList}}
+  }else{
+   const roster=await read('roster');
+   if(Array.isArray(roster.units)&&!roster.list){input={sharedList:roster};result=resolveSharedList(roster)}
+   else{
+    const manual=!!el('book').files[0];let book;
+    status(manual?'Reading faction data…':'Retrieving faction data…');
+    if(manual){book=await read('book');result=resolveArmy(roster,book,{allowVersionMismatch})}else result=await preview({roster,allowVersionMismatch});
+    input={roster,...(manual?{book}:{})};
+   }
+  }
+  formatted=formatForceOrgPreview(result);renderArmy();status(valid()?'Army imported successfully.':'Army imported for inspection only.',valid()?'ok':'');
+ }catch(e){clearResult();status('Cannot import: '+e.message,'error')}finally{setBusy(false)}
+};
+function download(obj,name){const url=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+el('download').onclick=()=>{if(result)download(result,'army-forge-preview.json')};
+el('forceorg').onclick=()=>{if(formatted)download(formatted,'force-org-preview.json')};
+function tick(){const remaining=Math.max(0,Math.ceil((expiresAt-Date.now())/1000));if(!remaining){clearInterval(timer);activeCode=null;el('copyCode').disabled=true;codeStatus('Code expired. Generate a new code.','error');return}codeStatus('Expires in '+Math.floor(remaining/60)+':'+String(remaining%60).padStart(2,'0')+' · '+result.modelCount+' models','ok')}
+el('generate').onclick=async()=>{
+ if(busy||!valid())return;clearCode();setBusy(true);el('codePanel').hidden=false;codeStatus('Generating army code…');
+ try{
+  const data=await post('/api/upload',input);
+  if(!/^OPR-[A-HJ-NP-Z2-9]{9}$/.test(data.code)||!Number.isFinite(data.expiresAt))throw Error('Invalid code service response');
+  activeCode=data.code;expiresAt=data.expiresAt;el('codeValue').textContent=activeCode;el('codeBox').hidden=false;el('copyCode').disabled=false;tick();timer=setInterval(tick,1000);
+ }catch(e){codeStatus('Cannot generate code: '+e.message,'error')}finally{setBusy(false)}
+};
+async function copy(value,button){try{await navigator.clipboard.writeText(value);button.textContent='Copied!';setTimeout(()=>{if(button.textContent==='Copied!')button.textContent=button.id==='copyCode'?'Copy code':'Copy server URL'},1500)}catch{codeStatus('Clipboard unavailable. Select and copy the value manually.','error')}}
+el('copyCode').onclick=()=>{if(activeCode&&Date.now()<expiresAt)copy(activeCode,el('copyCode'))};
+el('copyServer').onclick=()=>copy(server,el('copyServer'));
+for(const id of ['share','roster','book','mismatch'])el(id).addEventListener(id==='share'?'input':'change',()=>{if(busy)return;clearResult();status('')});
+el('share').addEventListener('keydown',e=>{if(e.key==='Enter'&&!busy)el('run').click()});
+</script>
+</body>
+</html>
