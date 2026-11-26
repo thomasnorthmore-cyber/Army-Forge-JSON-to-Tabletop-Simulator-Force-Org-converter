@@ -4,7 +4,7 @@ const roster={gameSystem:'gf',armyVersions:[{armyId:'test-id',version:'3.6.0'}],
 const book={uid:'test-id',gameSystemSlug:'grimdark-future',versionString:'3.6.0',units:[{id:'u'}],upgradePackages:[]};
 const response=(data=book,status=200,type='application/json')=>({ok:status===200,status,headers:{get:k=>k==='content-type'?type:null},text:async()=>JSON.stringify(data)});
 const fetcher=(data=book,status=200,type='application/json')=>async()=>response(data,status,type);
-assert.equal(factionRequest(roster).url,'https://army-forge.onepagerules.com/api/afs/book/test-id?gameSystem=grimdark-future');
+assert.equal(factionRequest(roster).url,'https://army-forge.onepagerules.com/api/afs/book/test-id?gameSystem=2');
 assert.throws(()=>factionRequest({...roster,list:{units:[{armyId:'../bad'}]}}),/Invalid faction ID/);
 assert.throws(()=>factionRequest({...roster,list:{units:[{armyId:'a'},{armyId:'b'}]}}),/one faction/);
 assert.deepEqual(await fetchFactionBook(roster,{fetchImpl:async(url,opts)=>{assert.equal(opts.credentials,'omit');assert.equal(opts.redirect,'error');return response()}}),book);
