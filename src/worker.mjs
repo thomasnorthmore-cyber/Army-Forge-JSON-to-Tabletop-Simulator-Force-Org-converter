@@ -34,6 +34,23 @@ export function createWorker({now=()=>Date.now(),random=globalThis.crypto,fetchB
  return {async fetch(request,env){
   const url=new URL(request.url);
   if(!url.pathname.startsWith('/api/'))return env.ASSETS?env.ASSETS.fetch(request):respond({error:'Website assets not configured'},404);
+  if(request.method==='POST'&&url.pathname==='/api/preview'){
+   const origin=request.headers.get('origin');
+   if(origin&&origin!==url.origin)return respond({error:'Cross-origin preview refused'},403);
+   let input;
+   try{input=await readJSON(request);if(!input?.roster)throw Error('Missing Army Forge roster')}
+   catch(e){return respond({error:String(e.message||e)},400)}
+   const allowVersionMismatch=input.allowVersionMismatch===true;
+   let book;
+   try{book=await fetchBook(input.roster,{allowVersionMismatch})}
+   catch(e){return respond({error:String(e.message||e)},502)}
+   try{
+    const resolved=resolveArmy(input.roster,book,{allowVersionMismatch});
+    // Only return selected model data; no full faction response or KV storage.
+    formatForceOrgPreview(resolved);
+    return respond({resolved});
+   }catch(e){return respond({error:String(e.message||e)},400)}
+  }
   if(!env.ARMIES)return respond({error:'KV namespace ARMIES is not configured'},503);
   if(request.method==='POST'&&url.pathname==='/api/upload'){
    // Browser requests must originate from this website.
