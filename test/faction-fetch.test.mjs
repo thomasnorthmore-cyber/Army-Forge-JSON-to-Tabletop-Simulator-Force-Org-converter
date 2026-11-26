@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {factionRequest,fetchFactionBook} from '../src/faction-fetch.mjs';
+const roster={gameSystem:'gf',armyVersions:[{armyId:'test-id',version:'3.6.0'}],list:{units:[{armyId:'test-id'}]}};
+const book={uid:'test-id',gameSystemSlug:'grimdark-future',versionString:'3.6.0',units:[{id:'u'}],upgradePackages:[]};
+const response=(data=book,status=200,type='application/json')=>({ok:status===200,status,headers:{get:k=>k==='content-type'?type:null},text:async()=>JSON.stringify(data)});
+const fetcher=(data=book,status=200,type='application/json')=>async()=>response(data,status,type);
+assert.equal(factionRequest(roster).url,'https://army-forge.onepagerules.com/api/afs/book/test-id?gameSystem=grimdark-future');
+assert.throws(()=>factionRequest({...roster,list:{units:[{armyId:'../bad'}]}}),/Invalid faction ID/);
+assert.throws(()=>factionRequest({...roster,list:{units:[{armyId:'a'},{armyId:'b'}]}}),/one faction/);
+assert.deepEqual(await fetchFactionBook(roster,{fetchImpl:async(url,opts)=>{assert.equal(opts.credentials,'omit');assert.equal(opts.redirect,'error');return response()}}),book);
+await assert.rejects(fetchFactionBook(roster,{fetchImpl:fetcher({...book,versionString:'3.6.1'})}),/Requested 3.6.0/);
+assert.equal((await fetchFactionBook(roster,{fetchImpl:fetcher({...book,versionString:'3.6.1'}),allowVersionMismatch:true})).versionString,'3.6.1');
+await assert.rejects(fetchFactionBook(roster,{fetchImpl:fetcher({...book,uid:'wrong'})}),/different or unsupported/);
+await assert.rejects(fetchFactionBook(roster,{fetchImpl:fetcher(book,403)}),/HTTP 403/);
+await assert.rejects(fetchFactionBook(roster,{fetchImpl:fetcher(book,200,'text/html')}),/did not return JSON/);
+await assert.rejects(fetchFactionBook(roster,{fetchImpl:async()=>{throw Error('network')}}),/network, CORS or timeout/);
+console.log('12 faction retrieval assertions passed');
