@@ -63,13 +63,18 @@ export function sharedListRequest(value){
  if(ids.length!==1||!id||!/^[A-Za-z0-9_-]{1,80}$/.test(id))throw Error('Invalid shared list ID');
  return {id,url:'https://army-forge.onepagerules.com/api/tts?id='+encodeURIComponent(id)};
 }
-export async function fetchSharedList(value,{fetchImpl=globalThis.fetch,timeoutMs=15000}={}){
+export async function fetchSharedList(value,{fetchImpl=(url,init)=>globalThis.fetch(url,init),timeoutMs=15000}={}){
  const {id,url}=sharedListRequest(value);
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
  try{
   let res;
-  try{res=await fetchImpl(url,{method:'GET',redirect:'error',credentials:'omit',headers:{Accept:'application/json'},signal:controller.signal})}
-  catch{throw Error('Army Forge shared-list connection failed. Save the API JSON in your browser and upload it instead.')}
+  try{res=await fetchImpl(url,{method:'GET',redirect:'manual',credentials:'omit',headers:{Accept:'application/json'},signal:controller.signal})}
+  catch(e){
+   const detail=controller.signal.aborted?'Timed out after '+timeoutMs+'ms':String(e?.message||e).replace(/[\r\n]/g,' ').slice(0,240);
+   console.warn('Army Forge shared-list fetch failed:',e?.name||'Error',detail);
+   throw Error('Army Forge shared-list connection failed: '+detail+'. Save the API JSON in your browser and upload it instead.');
+  }
+  if(res.status>=300&&res.status<400)throw Error('Army Forge redirected the API request (HTTP '+res.status+'). The Worker did not follow the redirect.');
   if(!res.ok)throw Error('Army Forge shared-list HTTP '+res.status);
   if(!/application\/(?:[\w.+-]*\+)?json\b/i.test(res.headers.get('content-type')||''))throw Error('Army Forge did not return JSON');
   if(Number(res.headers.get('content-length')||0)>5000000)throw Error('Shared response too large');
