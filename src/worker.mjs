@@ -35,6 +35,16 @@ export function createWorker({now=()=>Date.now(),random=globalThis.crypto,fetchB
  return {async fetch(request,env){
   const url=new URL(request.url);
   if(!url.pathname.startsWith('/api/'))return env.ASSETS?env.ASSETS.fetch(request):respond({error:'Website assets not configured'},404);
+  const isWrite=request.method==='POST'&&['/api/preview','/api/upload'].includes(url.pathname);
+  const isRead=request.method==='GET'&&url.pathname==='/api/army';
+  if(isWrite||isRead){
+   try{
+    if(env.REQUIRE_RATE_LIMITS==='true'&&(!env.CLIENT_LIMIT||!env.WRITE_LIMIT))return respond({error:'Rate limiting is not configured'},503);
+    const client=request.headers.get('CF-Connecting-IP')||'local';
+    if(env.CLIENT_LIMIT&&!(await env.CLIENT_LIMIT.limit({key:client})).success)return new Response(JSON.stringify({error:'Too many requests. Try again in a minute.'}),{status:429,headers:{'content-type':'application/json','cache-control':'no-store','retry-after':'60'}});
+    if(isWrite&&env.WRITE_LIMIT&&!(await env.WRITE_LIMIT.limit({key:'all-writes'})).success)return new Response(JSON.stringify({error:'Service busy. Try again in a minute.'}),{status:429,headers:{'content-type':'application/json','cache-control':'no-store','retry-after':'60'}});
+   }catch{return respond({error:'Rate limiting temporarily unavailable'},503)}
+  }
   if(request.method==='POST'&&url.pathname==='/api/preview'){
    const origin=request.headers.get('origin');
    if(origin&&origin!==url.origin)return respond({error:'Cross-origin preview refused'},403);
