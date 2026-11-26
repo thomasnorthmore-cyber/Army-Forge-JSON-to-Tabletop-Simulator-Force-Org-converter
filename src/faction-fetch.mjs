@@ -9,7 +9,7 @@ export function factionRequest(roster){
  if(typeof id!=='string'||!/^[A-Za-z0-9_-]{1,80}$/.test(id))throw Error('Invalid faction ID');
  const version=roster.armyVersions?.find(v=>v.armyId===id)?.version;
  if(typeof version!=='string'||!/^\d+\.\d+\.\d+$/.test(version))throw Error('Missing or invalid faction version');
- return {id,version,url:ORIGIN+'/api/afs/book/'+encodeURIComponent(id)+'?gameSystem=grimdark-future'};
+ return {id,version,url:ORIGIN+'/api/afs/book/'+encodeURIComponent(id)+'?gameSystem=2'};
 }
 export async function fetchFactionBook(roster,{fetchImpl=globalThis.fetch,allowVersionMismatch=false,timeoutMs=12000}={}){
  const {id,version,url}=factionRequest(roster);
