@@ -118,7 +118,7 @@ el('generate').onclick=async()=>{
  if(busy||!valid())return;clearCode();setBusy(true);el('codePanel').hidden=false;codeStatus('Generating army code…');
  try{
   const data=await post('/api/upload',input);
-  if(!/^OPR-[A-HJ-NP-Z2-9]{9}$/.test(data.code)||!Number.isFinite(data.expiresAt))throw Error('Invalid code service response');
+  if(!/^AF-[A-HJ-NP-Z2-9]{9}$/.test(data.code)||!Number.isFinite(data.expiresAt))throw Error('Invalid code service response');
   activeCode=data.code;expiresAt=data.expiresAt;el('codeValue').textContent=activeCode;el('codeBox').hidden=false;el('copyCode').disabled=false;tick();timer=setInterval(tick,1000);
  }catch(e){codeStatus('Cannot generate code: '+e.message,'error')}finally{setBusy(false)}
 };
