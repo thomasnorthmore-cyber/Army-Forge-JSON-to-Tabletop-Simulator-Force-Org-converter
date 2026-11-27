@@ -26,7 +26,7 @@ The Worker requests the single faction ID at `https://army-forge.onepagerules.co
 Run `node test/faction-fetch.test.mjs` for 12 mocked retrieval assertions. These do not verify the live endpoint.
 
 ## Code service (local or Cloudflare)
-The new Worker uses the same `OPR-XXXXXXXXX` code and GET `/api/army?code=...` response structure as the existing TTS importer. Its KV storage is separate: a code generated here must be redeemed against this new Worker's URL, not the New Recruit service URL.
+The Army Forge Worker generates `AF-XXXXXXXXX` codes; New Recruit retains `OPR-XXXXXXXXX`. The unified TTS save routes by prefix to the appropriate Worker. The Army Forge Worker still accepts legacy OPR codes for their remaining lifetime. Storage stays separate and the GET `/api/army?code=...` response contract is unchanged.
 
 Prerequisites: Node.js 22+, npm, and Wrangler (install with `npm install -D wrangler` locally). From the repository root:
 
