@@ -12,12 +12,50 @@ function inventory(entries){
  }
  return JSON.stringify([...out].sort(([a],[b])=>a.localeCompare(b)));
 }
+function verifyLoadout(u,m){
+  // Nested weapon quantities need additional fixtures; never silently guess them.
+  if(u.loadout.some(e=>e.type==='ArmyBookItem'&&arr(e.content).some(g=>g.type!=='ArmyBookRule')))throw Error('Unsupported nested equipment: '+u.name);
+  if(u.loadout.some(e=>!['ArmyBookWeapon','ArmyBookItem','ArmyBookRule'].includes(e.type)))throw Error('Unsupported loadout type: '+u.name);
+  const actual=m.flatMap(x=>[...x.weapons,...x.items]).map(e=>({...e,count:1}));
+  const expected=u.loadout.filter(e=>e.type!=='ArmyBookRule');
+  if(inventory(actual)!==inventory(expected))throw Error('Equipped loadout mismatch: '+u.name);
+  for(const r of u.loadout.filter(e=>e.type==='ArmyBookRule')){
+   if(m.filter(x=>x.rules.some(y=>ruleKey(y)===ruleKey(r))).length!==count(r))throw Error('Equipped rule mismatch: '+u.name);
+  }
+}
+function resolveMissingScopes(u,unit,selection,pack,book,roster,budget){
+ const unknown=pack.sections.filter(s=>!s.affects?.type||s.affects.type==='single');
+ if(unit.size<=1||!unknown.length)return;
+ if(!Number.isInteger(unit.size)||unit.size>100)throw Error('Invalid size: '+u.name);
+ // Never override explicit scopes. Bound the search per unit and per list.
+ const combinations=unit.size**unknown.length;
+ if(!Number.isSafeInteger(combinations)||combinations>256||combinations>budget.remaining)
+  throw Error('Too many unspecified upgrade scopes: '+u.name);
+ budget.remaining-=combinations;
+ const localBook={...book,units:[unit],upgradePackages:[pack]};
+ const localRoster={...roster,listPoints:undefined,list:{...roster.list,modelCount:unit.size,units:[{...selection,joinToUnit:null}]}};
+ let match=null;
+ for(let n=0;n<combinations;n++){
+  let k=n;
+  const quantities=unknown.map(()=>{const q=k%unit.size+1;k=Math.floor(k/unit.size);return q});
+  unknown.forEach((s,i)=>{s.affects={type:'exactly',value:quantities[i]}});
+  try{
+   const candidate=resolveArmy(localRoster,localBook);
+   verifyLoadout(u,candidate.units[0].models);
+  }catch{continue}
+  if(match!==null)throw Error('Ambiguous unspecified upgrade scope: '+u.name);
+  match=quantities;
+ }
+ if(match===null)throw Error('Cannot verify unspecified upgrade scope against equipped loadout: '+u.name);
+ unknown.forEach((s,i)=>{s.affects={type:'exactly',value:match[i]}});
+}
 export function resolveSharedList(data){
  if(data?.gameSystem!=='gf'||!Array.isArray(data.units)||!data.units.length||data.units.length>500)throw Error('Expected a Grimdark Future shared-list response');
  if(!Number.isInteger(data.listPoints)||data.listPoints<0||!Number.isInteger(data.modelCount)||data.modelCount<1)throw Error('Missing valid list points or model count');
  if(data.campaignMode||data.narrativeMode)throw Error('Campaign and narrative lists are not supported yet');
  const uid='shared-list',version='3.6',book={uid,gameSystemSlug:'grimdark-future',versionString:version,units:[],upgradePackages:[]};
  const roster={gameSystem:'gf',armyVersions:[{armyId:uid,version}],listPoints:data.listPoints,list:{name:data.name,modelCount:data.modelCount,units:[]}};
+ const scopeBudget={remaining:1024};
  for(const [i,u] of data.units.entries()){
   if(u.valid===false||u.combined||u.hasBalanceInvalid||arr(u.traits).length)throw Error('Unsupported or invalid selection: '+u.name);
   if(!Array.isArray(u.loadout)||!Array.isArray(u.rules)||!Array.isArray(u.selectedUpgrades)||!Number.isFinite(u.cost))throw Error('Missing shared-list equipment: '+u.name);
@@ -38,20 +76,13 @@ export function resolveSharedList(data){
   }
   book.upgradePackages.push({uid:p,sections:[...sections.values()]});
   roster.list.units.push({id,armyId:uid,selectionId:u.selectionId,joinToUnit:u.joinToUnit,selectedUpgrades});
+  resolveMissingScopes(u,book.units.at(-1),roster.list.units.at(-1),book.upgradePackages.at(-1),book,roster,scopeBudget);
  }
  const resolved=resolveArmy(roster,book);
  if(resolved.computedPoints!==data.listPoints||resolved.warnings.length)throw Error('Shared list points do not match reconstructed equipment');
  for(const [i,u] of data.units.entries()){
   const m=resolved.units[i].models;
-  // Nested weapon quantities need additional fixtures; never silently guess them.
-  if(u.loadout.some(e=>e.type==='ArmyBookItem'&&arr(e.content).some(g=>g.type!=='ArmyBookRule')))throw Error('Unsupported nested equipment: '+u.name);
-  if(u.loadout.some(e=>!['ArmyBookWeapon','ArmyBookItem','ArmyBookRule'].includes(e.type)))throw Error('Unsupported loadout type: '+u.name);
-  const actual=m.flatMap(x=>[...x.weapons,...x.items]).map(e=>({...e,count:1}));
-  const expected=u.loadout.filter(e=>e.type!=='ArmyBookRule');
-  if(inventory(actual)!==inventory(expected))throw Error('Equipped loadout mismatch: '+u.name);
-  for(const r of u.loadout.filter(e=>e.type==='ArmyBookRule')){
-   if(m.filter(x=>x.rules.some(y=>ruleKey(y)===ruleKey(r))).length!==count(r))throw Error('Equipped rule mismatch: '+u.name);
-  }
+  verifyLoadout(u,m);
  }
  // TTS responses lack a patch-level version. 3.6 is our configured formatter rules family, not an independently verified book version.
  return {...resolved,source:'army-forge-tts',rosterVersion:null,bookVersion:'3.6',versionVerified:false};
