@@ -5,13 +5,13 @@ import {fetchSharedList,resolveSharedList} from './shared-list.mjs';
 
 const TTL=600, MAX_BYTES=6_000_000, MAX_STORED=1_000_000;
 const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const codePattern=/^OPR-[A-HJ-NP-Z2-9]{9}$/;
+const codePattern=/^(?:AF|OPR)-[A-HJ-NP-Z2-9]{9}$/;
 const respond=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 export function newCode(random=globalThis.crypto){
  let s='';
  // The alphabet has 32 characters, so each byte maps uniformly.
  for(const b of random.getRandomValues(new Uint8Array(9)))s+=alphabet[b%alphabet.length];
- return 'OPR-'+s;
+ return 'AF-'+s;
 }
 async function readJSON(request){
  if(!/^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type')||''))throw Error('Expected application/json');
