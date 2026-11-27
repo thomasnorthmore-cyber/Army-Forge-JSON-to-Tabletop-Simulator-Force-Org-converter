@@ -10,9 +10,9 @@ const worker=createWorker({now:()=>time,random:webcrypto,fetchBook:async()=>{fet
 const origin='https://example.test';
 const post=(input,headers={})=>worker.fetch(new Request(origin+'/api/upload',{method:'POST',headers:{'content-type':'application/json',...headers},body:JSON.stringify(input)}),env);
 const get=code=>worker.fetch(new Request(origin+'/api/army?code='+encodeURIComponent(code)),env);
-assert.match(newCode(webcrypto),/^OPR-[A-HJ-NP-Z2-9]{9}$/);
+assert.match(newCode(webcrypto),/^AF-[A-HJ-NP-Z2-9]{9}$/);
 const response=await post({roster,book});assert.equal(response.status,200);
-const result=await response.json();assert.match(result.code,/^OPR-[A-HJ-NP-Z2-9]{9}$/);
+const result=await response.json();assert.match(result.code,/^AF-[A-HJ-NP-Z2-9]{9}$/);
 assert.equal(result.expiresInSeconds,600);
 assert.equal(result.expiresAt,time+600000);
 assert.equal(ttls[0],600);
