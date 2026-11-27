@@ -15,7 +15,7 @@
 <header>
 <div class="brand"><span class="mark" aria-hidden="true">↗</span> Force Org importer</div>
 <h1>Army Forge to Tabletop Simulator</h1>
-<p class="muted">Import your Grimdark Future army in three simple steps.</p>
+<p class="muted">Import your Grimdark Future army into Tabletop Simulator.</p>
 </header>
 <section class="panel" aria-labelledby="importHeading">
 <div class="eyebrow">01 / Import</div>
@@ -25,35 +25,29 @@
 <input id="share" type="url" placeholder="https://army-forge.onepagerules.com/share?id=…" autocomplete="off" spellcheck="false">
 <button id="run" class="primary">Import army</button>
 <p id="status" class="status" role="status" aria-live="polite"></p>
-<details id="advanced"><summary>Advanced import options</summary>
-<label for="roster">Army JSON or saved TTS response</label><input id="roster" type="file" accept=".json,application/json">
-<label for="book">Optional faction response</label><input id="book" type="file" accept=".json,.txt,application/json,text/plain">
-<label class="check"><input id="mismatch" type="checkbox"> Allow a different faction version for inspection only</label>
-<small>Leave the share link empty when importing a file.</small></details>
+</section>
+<section id="codePanel" class="panel" hidden aria-labelledby="codeHeading">
+<div class="eyebrow">02 / Army code</div>
+<h2 id="codeHeading">Your army code</h2>
+<p class="muted">Paste the code into the Force Org import window in Tabletop Simulator.</p>
+<button id="generate" class="primary" disabled>Generate army code</button>
+<div id="codeBox" class="codebox" hidden><output id="codeValue" aria-label="Army code"></output><button id="copyCode" disabled>Copy code</button></div>
+<p id="codeStatus" class="status" role="status" aria-live="polite"></p>
+<details><summary>First time setup</summary><p class="muted">Set the Force Org import server to:</p><div class="actions"><button id="copyServer" class="secondary">Copy server URL</button></div><small id="serverUrl"></small></details>
 </section>
 <section id="armyPanel" class="panel" hidden aria-labelledby="armyTitle">
-<div class="eyebrow">02 / Review</div>
+<div class="eyebrow">03 / Army list</div>
 <h2 id="armyTitle"></h2>
 <p id="armyMeta" class="muted"></p>
 <div class="metrics"><div class="metric"><strong id="points"></strong><span>Points</span></div><div class="metric"><strong id="models"></strong><span>Models</span></div><div class="metric"><strong id="groups"></strong><span>Unit groups</span></div></div>
 <div id="unitList"></div>
 <p id="warnings" class="status error" hidden></p>
-<button id="generate" class="primary" disabled>Generate army code</button>
 <details><summary>Model details &amp; diagnostic downloads</summary><pre id="out"></pre><div class="actions"><button id="download" class="secondary" disabled>Diagnostic JSON</button><button id="forceorg" class="secondary" disabled>Force Org JSON</button></div></details>
 </section>
-<section id="codePanel" class="panel" hidden aria-labelledby="codeHeading">
-<div class="eyebrow">03 / Import into TTS</div>
-<h2 id="codeHeading">Your army code</h2>
-<p class="muted">Paste the code into the Force Org import window in Tabletop Simulator.</p>
-<div id="codeBox" class="codebox" hidden><output id="codeValue" aria-label="Army code"></output><button id="copyCode" disabled>Copy code</button></div>
-<p id="codeStatus" class="status" role="status" aria-live="polite"></p>
-<details><summary>First time setup</summary><p class="muted">Set the Force Org import server to:</p><div class="actions"><button id="copyServer" class="secondary">Copy server URL</button></div><small id="serverUrl"></small></details>
-</section>
-<footer><p>Codes expire after 10 minutes. Independent community tool, not an official One Page Rules or Tabletop Simulator product.</p><details><summary>Compatibility &amp; privacy</summary><p>Grimdark Future 3.6 formatter. Shared responses do not specify a patch version. Unsupported equipment or combined squads are rejected rather than silently altered. Manual files are resolved locally; shared links are retrieved directly from Army Forge where possible, with Worker fallback. Code generation sends the input for validation and stores only the converted model cards for 10 minutes.</p></details></footer>
+<footer><p>Codes expire after 10 minutes. Independent community tool, not an official One Page Rules or Tabletop Simulator product.</p><details><summary>Compatibility &amp; privacy</summary><p>Grimdark Future 3.6 formatter. Shared responses do not specify a patch version. Unsupported equipment or combined squads are rejected rather than silently altered. Shared links are retrieved directly from Army Forge where possible, with Worker fallback. Code generation sends the input for validation and stores only the converted model cards for 10 minutes.</p></details></footer>
 </main>
 <script type="module">
 import {resolveSharedList,fetchSharedList} from './src/shared-list.mjs';
-import {resolveArmy} from './src/army-forge.mjs';
 import {formatForceOrgPreview} from './src/force-org.mjs';
 const el=id=>document.getElementById(id);
 let result,formatted,input,activeCode,expiresAt,timer,busy=false;
@@ -63,9 +57,8 @@ function status(message,kind=''){el('status').textContent=message;el('status').c
 function codeStatus(message,kind=''){el('codeStatus').textContent=message;el('codeStatus').className='status '+kind}
 function clearCode(){clearInterval(timer);activeCode=null;expiresAt=null;el('codePanel').hidden=true;el('codeBox').hidden=true;el('codeValue').textContent='';el('copyCode').disabled=true;el('copyCode').textContent='Copy code';codeStatus('')}
 function valid(){return !!input&&!!result&&!result.warnings.length&&Number.isInteger(result.declaredPoints)&&result.declaredPoints===result.computedPoints}
-function setBusy(value){busy=value;for(const id of ['share','roster','book','mismatch','run'])el(id).disabled=value;el('generate').disabled=value||!valid()}
+function setBusy(value){busy=value;for(const id of ['share','run'])el(id).disabled=value;el('generate').disabled=value||!valid()}
 function clearResult(){result=null;formatted=null;input=null;clearCode();el('armyPanel').hidden=true;el('download').disabled=true;el('forceorg').disabled=true;el('generate').disabled=true}
-async function read(id){const f=el(id).files[0];if(!f)throw Error('Choose a share link or JSON file first.');if(f.size>5000000)throw Error('File exceeds 5 MB');return JSON.parse(await f.text())}
 async function post(path,payload){const response=await fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});let data;try{data=await response.json()}catch{throw Error('Service returned an invalid response (HTTP '+response.status+')')}if(!response.ok)throw Error(data.error||'Service unavailable');return data}
 async function preview(payload){return (await post('/api/preview',payload)).resolved}
 function renderArmy(){
@@ -82,31 +75,20 @@ function renderArmy(){
  el('warnings').textContent=result.warnings.join(' · ');el('warnings').hidden=!result.warnings.length;
  const lines=[result.listName,result.source==='army-forge-tts'?'Shared-list data / patch version not provided':'Roster '+result.rosterVersion+' / faction '+result.bookVersion,'Declared points: '+(result.declaredPoints??'unknown')+' | computed: '+result.computedPoints,...result.warnings,''];
  for(const u of result.units){lines.push(u.name+' ×'+u.models.length+' — '+u.points+' pts');for(const [i,m] of u.models.entries())lines.push('  '+(i+1)+': '+m.weapons.map(w=>w.name+' (A'+w.attacks+(w.range?', '+w.range+'"':'')+(w.effectiveRules.length?', '+w.effectiveRules.join(', '):'')+')').join('; ')+' | '+m.abilities.join(', '))}
- el('out').textContent=lines.join('\n');el('armyPanel').hidden=false;el('download').disabled=false;el('forceorg').disabled=false;
+ el('out').textContent=lines.join('\n');el('codePanel').hidden=false;el('armyPanel').hidden=false;el('download').disabled=false;el('forceorg').disabled=false;
 }
 el('run').onclick=async()=>{
  if(busy)return;clearResult();setBusy(true);
  try{
-  const shareUrl=el('share').value.trim(),allowVersionMismatch=el('mismatch').checked;
-  if(shareUrl){
-   if(el('roster').files.length)throw Error('Choose a share link or file, not both.');
-   status('Retrieving army from Army Forge…');
-   let sharedList;
-   try{sharedList=await fetchSharedList(shareUrl)}catch(browserError){
-    status('Trying the import server…');
-    try{input={shareUrl};result=await preview(input)}catch(workerError){throw Error('Browser: '+browserError.message+' | Server: '+workerError.message)}
-   }
-   if(sharedList){result=resolveSharedList(sharedList);input={sharedList}}
-  }else{
-   const roster=await read('roster');
-   if(Array.isArray(roster.units)&&!roster.list){input={sharedList:roster};result=resolveSharedList(roster)}
-   else{
-    const manual=!!el('book').files[0];let book;
-    status(manual?'Reading faction data…':'Retrieving faction data…');
-    if(manual){book=await read('book');result=resolveArmy(roster,book,{allowVersionMismatch})}else result=await preview({roster,allowVersionMismatch});
-    input={roster,...(manual?{book}:{})};
-   }
+  const shareUrl=el('share').value.trim();
+  if(!shareUrl)throw Error('Paste an Army Forge share link first.');
+  status('Retrieving army from Army Forge…');
+  let sharedList;
+  try{sharedList=await fetchSharedList(shareUrl)}catch(browserError){
+   status('Trying the import server…');
+   try{input={shareUrl};result=await preview(input)}catch(workerError){throw Error('Browser: '+browserError.message+' | Server: '+workerError.message)}
   }
+  if(sharedList){result=resolveSharedList(sharedList);input={sharedList}}
   formatted=formatForceOrgPreview(result);renderArmy();status(valid()?'Army imported successfully.':'Army imported for inspection only.',valid()?'ok':'');
  }catch(e){clearResult();status('Cannot import: '+e.message,'error')}finally{setBusy(false)}
 };
@@ -125,7 +107,7 @@ el('generate').onclick=async()=>{
 async function copy(value,button){try{await navigator.clipboard.writeText(value);button.textContent='Copied!';setTimeout(()=>{if(button.textContent==='Copied!')button.textContent=button.id==='copyCode'?'Copy code':'Copy server URL'},1500)}catch{codeStatus('Clipboard unavailable. Select and copy the value manually.','error')}}
 el('copyCode').onclick=()=>{if(activeCode&&Date.now()<expiresAt)copy(activeCode,el('copyCode'))};
 el('copyServer').onclick=()=>copy(server,el('copyServer'));
-for(const id of ['share','roster','book','mismatch'])el(id).addEventListener(id==='share'?'input':'change',()=>{if(busy)return;clearResult();status('')});
+el('share').addEventListener('input',()=>{if(busy)return;clearResult();status('')});
 el('share').addEventListener('keydown',e=>{if(e.key==='Enter'&&!busy)el('run').click()});
 </script>
 </body>
